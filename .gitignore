@@ -1,0 +1,12 @@
+.DS_Store
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.log
+*.pid
+*.lock
+*.csv
+*.ex5
+tv_signal_processed_ids.txt
