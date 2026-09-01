@@ -1,0 +1,5 @@
+{
+  "secret": "REPLACE_WITH_YOUR_SECRET",
+  "action": "close_all",
+  "symbol": "EURUSD"
+}

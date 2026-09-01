@@ -1,0 +1,9 @@
+{
+  "secret": "REPLACE_WITH_YOUR_SECRET",
+  "action": "sell",
+  "symbol": "EURUSD",
+  "trade_type": "breakout",
+  "lot": 0.01,
+  "sl": 1.0900,
+  "tp": 1.0800
+}
