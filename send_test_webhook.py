@@ -32,6 +32,11 @@ def parse_args() -> argparse.Namespace:
         default=os.environ.get("TV_BRIDGE_SECRET"),
         help="Webhook secret. Defaults to TV_BRIDGE_SECRET.",
     )
+    parser.add_argument(
+        "--print-json",
+        action="store_true",
+        help="Print a ready-to-paste TradingView JSON message instead of sending it.",
+    )
     return parser.parse_args()
 
 
@@ -52,12 +57,14 @@ def main() -> int:
         "action": args.action,
         "symbol": args.symbol,
     }
-    if args.action == "close_all":
-        payload.update({"lot": 0, "sl": 0, "tp": 0})
-    else:
+    if args.action != "close_all":
         payload.update(
             {"trade_type": args.trade_type, "lot": args.lot, "sl": args.sl, "tp": args.tp}
         )
+
+    if args.print_json:
+        print(json.dumps(payload, indent=2))
+        return 0
 
     body = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(
