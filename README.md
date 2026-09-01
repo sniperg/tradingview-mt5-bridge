@@ -16,6 +16,8 @@ TradingView sends JSON to a local Flask server through an HTTPS tunnel. The serv
 - `examples/` — sample TradingView alert bodies.
 - `tests/` — server validation and file-handoff tests.
 
+For the exact webhook field reference and ready-to-paste notification bodies, see [Alert message format](docs/ALERT_FORMAT.md).
+
 ## Requirements
 
 - Python 3.10 or newer
@@ -25,7 +27,11 @@ TradingView sends JSON to a local Flask server through an HTTPS tunnel. The serv
 
 The shell helpers target macOS/Linux. The Python server and EA can also be used on Windows by running the equivalent commands manually.
 
-## 1. Install the server
+## 1. Download and install the server
+
+The repository owner must make the repository public or grant your GitHub account access before you can download it.
+
+With Git installed:
 
 ```bash
 git clone https://github.com/sniperg/tradingview-mt5-bridge.git
@@ -34,19 +40,40 @@ chmod +x scripts/*.sh
 ./scripts/setup.sh
 ```
 
-Open `.env` and replace every placeholder. Generate a unique secret, for example:
+Without Git, use GitHub's **Code → Download ZIP**, extract the archive, open a terminal in the extracted folder, and run:
 
 ```bash
-python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
+chmod +x scripts/*.sh
+./scripts/setup.sh
 ```
 
-Never commit `.env` or paste your secret into an issue, screenshot, or public alert example.
+Setup installs the Python dependencies, creates `.env`, and generates a fresh random bridge secret. If setup asks for the signal-file path and you do not know it yet, press Enter and complete the next section before editing `.env`.
+
+### The keys and credentials are different
+
+- **Bridge secret (`TV_BRIDGE_SECRET`)** — generated locally in `.env`. The server and every TradingView alert must use the exact same value. It is case-sensitive. This is the only credential inside the alert message.
+- **Tunnel credential** — for example, an ngrok authtoken. Configure it with the tunnel provider's own login command. Never put it in `.env` as `TV_BRIDGE_SECRET` and never send it in a TradingView alert.
+- **MT5 login** — stays inside MetaTrader 5. The bridge source, Flask server, and TradingView message do not need the MT5 account password.
+- **GitHub login** — needed only to download a private repository; it has no role in trading.
+
+Never commit `.env` or paste its secret into an issue, screenshot, chat, or public example. If the bridge secret is exposed, generate a replacement, update `.env`, restart the server, and update every TradingView alert.
 
 ## 2. Find the MT5 shared files folder
 
-In MetaTrader 5, choose **File → Open Data Folder**. Locate the terminal-wide `Common/Files` directory and set `TV_BRIDGE_SIGNAL_FILE` in `.env` to its full `tv_signal.csv` path.
+In MetaTrader 5, choose **File → Open Data Folder**. The opened directory is normally one terminal instance below the `Terminal` directory. Go up to `Terminal`, then open `Common/Files`. Set `TV_BRIDGE_SIGNAL_FILE` in `.env` to the full path of a file named `tv_signal.csv` inside that folder.
 
 Typical paths vary by operating system, broker build, and macOS Wine wrapper. Do not copy another person's absolute path.
+
+The finished `.env` must contain real values in this shape:
+
+```dotenv
+TV_BRIDGE_SECRET=your_generated_value
+TV_BRIDGE_SIGNAL_FILE="/your/real/path/MetaQuotes/Terminal/Common/Files/tv_signal.csv"
+TV_BRIDGE_HOST=127.0.0.1
+TV_BRIDGE_PORT=5055
+```
+
+Do not put spaces around `=`. Keep paths with spaces inside double quotes.
 
 ## 3. Install the Expert Advisor
 
@@ -104,7 +131,30 @@ Keep the Flask server bound to `127.0.0.1`; let the tunnel provide public HTTPS.
 
 ## 6. Create TradingView alerts
 
-Use a valid JSON body. Replace the example secret with the unique value from your `.env`.
+1. Open the desired chart and create an alert.
+2. Choose the condition that should trigger the trade.
+3. Enable the **Webhook URL** notification.
+4. Paste the public HTTPS tunnel URL ending in `/webhook`.
+5. Paste a valid JSON object into the alert's **Message** field.
+6. Verify the broker symbol, lot size, and absolute SL/TP prices.
+7. Create the alert and trigger it on a demo account first.
+
+The webhook method is `POST` and the message must be JSON. The server rejects bodies larger than 16 KiB. Replace the example secret with the exact value after `TV_BRIDGE_SECRET=` in `.env`; do not include `.env` quote characters in the JSON value.
+
+To avoid typing mistakes, print a complete ready-to-paste buy message using the secret already stored in `.env`:
+
+```bash
+.venv/bin/python send_test_webhook.py \
+  --print-json \
+  --action buy \
+  --symbol EURUSD \
+  --trade-type breakout \
+  --lot 0.01 \
+  --sl 1.0800 \
+  --tp 1.0900
+```
+
+This command displays the secret in the terminal output. Paste the result only into your private TradingView alert message and then clear the terminal if necessary.
 
 Buy or sell signals require:
 
@@ -140,6 +190,22 @@ Close every position opened by this bridge for one symbol and magic number:
 ```
 
 The EA will reject invalid symbol names, volumes outside broker limits, stops on the wrong side of the market, and stops closer than the broker permits.
+
+For buys, use `SL < current ask < TP`. For sells, use `TP < current bid < SL`. The example prices are illustrations and will usually be wrong for the current market. The symbol must exactly match MT5, including broker suffixes such as `.a`, `m`, or `_pro`; TradingView's ticker name may not be identical.
+
+See [Alert message format](docs/ALERT_FORMAT.md) for the complete field table, sell payload, close behavior, HTTP responses, and dynamic-alert guidance.
+
+## Normal daily startup
+
+Every time the computer or tunnel restarts:
+
+1. Open MT5, log in, attach the EA, and enable Algo Trading.
+2. Run `./scripts/run_bridge.sh` and keep it running.
+3. Run `./scripts/run_ngrok.sh` in a second terminal and keep it running.
+4. If the tunnel URL changed, update the Webhook URL in every TradingView alert.
+5. Run `./scripts/check_bridge_status.sh`.
+
+The bridge is ready only when the Flask server, HTTPS tunnel, MT5 terminal, and EA are all running.
 
 ## Tests
 
